@@ -66,5 +66,9 @@ For install Python connect to the Tool
 pip install mysql-connector-python
 pip install matplotlib pandas tk fpdf selenium psutil requests
 
+# Import function install
+
+pip install matplotlib pandas requests mysql-connector-python beautifulsoup4 fpdf numpy selenium webdriver-manager psutil
+
 For testing use DVWA you can follow below youtube link to install.
 https://youtu.be/Yzksa_WjnY0?si=JcqOVJAGyway9MlX

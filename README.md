@@ -70,5 +70,37 @@ pip install matplotlib pandas tk fpdf selenium psutil requests
 
 pip install matplotlib pandas requests mysql-connector-python beautifulsoup4 fpdf numpy selenium webdriver-manager psutil
 
+# Core dependencies
+
+sudo pip install matplotlib pandas numpy requests psutil
+
+# PDF generation
+
+sudo pip install fpdf
+
+# Web scraping
+
+sudo pip install beautifulsoup4
+
+# Database connectivity
+
+sudo pip install mysql-connector-python
+
+# Browser automation
+
+sudo pip install selenium webdriver-manager
+
+# GUI components
+
+sudo apt install python3-tk
+
+# Browser and drivers
+
+sudo apt install firefox-esr geckodriver
+
+# Database server
+
+sudo apt install mariadb-server
+
 For testing use DVWA you can follow below youtube link to install.
 https://youtu.be/Yzksa_WjnY0?si=JcqOVJAGyway9MlX

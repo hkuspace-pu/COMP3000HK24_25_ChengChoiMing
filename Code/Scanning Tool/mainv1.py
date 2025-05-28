@@ -68,7 +68,6 @@ cve_list = {} # {"3555":234, "4559":213}
 cve_content = []
 url_path = []
 
-
 def run_nikto():
     result_text.delete('1.0', tk.END)
     t = threading.Thread(target = rnikto)    
@@ -156,13 +155,13 @@ def get_target():
     if not host:
         return raw_target, False
     
-    #port = parsed_url.port
+    port = parsed_url.port
     path = parsed_url.path
 
     
     target_cmd = f" -h {host}"
-    #if port:
-        #target_cmd += f" -port {port}"
+    if port:
+        target_cmd += f" -port {port}"
     if path:
         target_cmd += f" -root {path}"
 
@@ -267,7 +266,7 @@ def rnikto():
             msg1 = output.decode('utf-8', errors='replace')
             test = msg1.split('\n')
             root.after(0, lambda: display_result(test, cmd))
-            db_content = ""
+            db_content = '||NEWLINE||'.join(test)
     for i in range(len(test)):
             db_content += test[i]
             db_content += ","     
@@ -347,7 +346,7 @@ class ZAPController:
         if self.zap_process:
             try:
                self.zap_process.terminate()
-               self.zap_process.wait(timeout=5)
+               self.zap_process.wait(timeout=20)
             except subprocess.TimeoutExpired:
                self.zap_process.kill()
         self.zap_process = None
@@ -370,6 +369,8 @@ class ZAPController:
                 return False
             
             options = Options()
+            options.set_preference("acceptInsecureCerts", True)
+            options.set_preference("security.enterprise_roots.enabled", True)
             options.set_preference("network.proxy.type", 1)
             options.set_preference("network.proxy.http", "localhost")
             options.set_preference("network.proxy.http_port", self.zap_port)
@@ -378,7 +379,10 @@ class ZAPController:
             options.set_preference("network.proxy.no_proxies_on", "")
             options.set_preference("extensions.checkCompatibility.nightly", False)
             options.set_preference("extensions.zap.hud.enabled", True)
+            options.set_preference("network.proxy.share_proxy_settings", True)
             options.headless = False
+
+            requests.packages.urllib3.disable_warnings()
 
             gecko_path = "/usr/local/bin/geckodriver"
             service = Service(executable_path=gecko_path)
@@ -415,7 +419,7 @@ def start_zap_attack():
         result_text.insert(tk.END, "Error: Please Enter a target URL First\n")
         return
         
-    result_text.insert(tk.END, "Starting ZAP HUD Attack.... \n")
+    result_text.insert(tk.END, "Starting HUD Mode.... \n")
     result_text.update_idletasks()
 
     try:
@@ -425,10 +429,10 @@ def start_zap_attack():
             target = f"http://{target}"
 
         if zap.launch_attack(target):
-            result_text.insert(tk.END, f"ZAP HUD Active For: {target}\n")
+            result_text.insert(tk.END, f"HUD Active For: {target}\n")
             result_text.insert(tk.END, "Open Firefox to Interact With The HUD MODE\n")
         else:
-            result_text.insert(tk.END, "ZAP Attack Failed - Check Terminal\n")
+            result_text.insert(tk.END, "Enable Failed - Check Terminal\n")
         
     except Exception as e:
         result_text.insert(tk.END, f"Error: {str(e)}\n")
@@ -464,14 +468,14 @@ def select_prev(lb_prev, n_prev):
     sql = "select * from nikto where id = " + db_id
     mycursor.execute(sql)
     db_result = mycursor.fetchall()
-    db_content = db_result[0][2].split(",")
+    db_content = db_result[0][2].split('||NEWLINE||')
     display_result(db_content, db_result[0][3])
     mycursor.close()
     n_prev.destroy()
                         
 def add_zap_button(self):
     btn_zap = tk.Button(n_button,
-                text="ZAP HUD MODE",
+                text="HUD MODE",
                 command=self.start_zap_attack)
     btn_zap.grid(row=6, column=0, pady=5, sticky="nsew")
 
@@ -520,7 +524,7 @@ def open_compare_to(lb_prev, n_prev):
         sql = "select * from nikto where id = " + db_id
         mycursor.execute(sql)
         db_result = mycursor.fetchall()
-        test = db_result[0][2].split(",")
+        test = db_result[0][2].split("||NEWLINE||")
 
         count_list_name = instrest_list_content
         count_list = [0,0,0]
@@ -861,7 +865,7 @@ def export_result():
     root.after(0, lambda: updateChart(df1, df2))
     figure1x = plt.Figure(figsize=(8,4), dpi=100)
     ax1 = figure1x.add_subplot(111)
-    ax1.set_title("Insteresting type count")
+    ax1.set_title("Insteresting type count", fontsize=9)
     plt.ylim(bottom=0)
     try:
         df1.plot(kind="bar", legend=False, ax=ax1)
@@ -873,7 +877,7 @@ def export_result():
     
     figure2x = plt.Figure(figsize=(8,4), dpi=100)
     ax2 = figure2x.add_subplot(111)
-    ax2.set_title("OSVDB type")
+    ax2.set_title("OSVDB type", fontsize=9)
     try:
         df2.plot(kind="bar", legend=False, ax=ax2)
     except:
@@ -903,9 +907,11 @@ def export_result():
     for item in result_info:
         pdf.cell(100, 5, item, 0 ,2)
         pdf.ln(5)
-    pdf.cell(-10)
+    pdf.cell(-5)
     pdf.image('figure1x.png', x = None, y = None, w = 0, h = 0, type = '', link = '')
+    pdf.ln(70)
     pdf.image('figure2x.png', x = None, y = None, w = 0, h = 0, type = '', link = '')
+    pdf.ln(70)
     epw = pdf.w - 2 * pdf.l_margin
     w1 = epw / 6
     w2 = w1 * 5
@@ -1193,7 +1199,7 @@ btn_compare.grid(row = 4, column = 0, pady = 5, sticky="nsew")
 btn_export = tk.Button(n_button, text="Export", command = export_result)
 btn_export.grid(row = 5, column = 0, pady = 5, sticky="nsew")
 
-btn_zap = tk.Button(n_button, text="ZAP HUD MODE", command = start_zap_attack)
+btn_zap = tk.Button(n_button, text="HUD MODE", command = start_zap_attack)
 btn_zap.grid(row = 6, column = 0, pady = 5, sticky="nsew")
 
 

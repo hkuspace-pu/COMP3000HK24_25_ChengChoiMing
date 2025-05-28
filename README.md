@@ -107,3 +107,6 @@ https://youtu.be/Yzksa_WjnY0?si=JcqOVJAGyway9MlX
 
 For test use AI you can follow below youtube link to install.
 https://youtu.be/nt1SzojVy38?si=GRxObTS_0z4QI7Fb
+
+Download the Ollama
+https://ollama.com/download/windows

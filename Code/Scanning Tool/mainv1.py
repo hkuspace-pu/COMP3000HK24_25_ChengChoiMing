@@ -1203,3 +1203,735 @@ btn_zap = tk.Button(n_button, text="HUD MODE", command = start_zap_attack)
 btn_zap.grid(row = 6, column = 0, pady = 5, sticky="nsew")
 
 
+
+
+
+
+# Nikto 
+
+# skipfish -o 
+
+def select_dir_s():
+    filename = filedialog.askdirectory()
+    en_op_s.delete(0, tk.END)
+    en_op_s.insert(tk.END, filename)
+
+def run_skipfish():
+    result_text.delete('1.0', tk.END)
+    t2 = threading.Thread(target = rskipfish)    
+    t2.start()
+
+
+def reset_skip():
+    url_path.clear()
+    en_ip_s.delete(0, tk.END)
+    en_dir_s.delete(0, tk.END)
+    en_op_s.delete(0, tk.END)
+    reset_chart()
+
+    # for i in range(len(bi_list_value_s)):
+    #     bi_list_value_s[i].set(0)
+    #     bi_list_text_s[i].delete(0, tk.END)
+
+    for i in range(len(per_list_value_s)):
+        per_list_value_s[i].set(0)
+    
+    for i in range(len(per_list_text_s)):
+        per_list_text_s[i].delete(0, tk.END)
+
+    for i in range(len(rp_list_value_s)):
+        rp_list_value_s[i].set(0)
+    
+    for i in range(len(rp_list_text_s)):
+        rp_list_text_s[i].delete(0, tk.END)
+    reset_skip_info()
+    reset_skip_result()
+
+def reset_skip_result():
+    result_text_s.delete('1.0', tk.END)
+
+def reset_skip_info():
+    unlock_skipfish()
+    for i in range(len(s_result_list_value_n)):
+        s_result_list_value_n[i].delete(0, tk.END)
+        s_result_list_value_n[i].config(fg = "black", background = "white")
+
+def lock_skipfish():
+    for i in range(1, len(s_result_list_value_n)):
+        s_result_list_value_n[i].config(state="disable")
+
+def unlock_skipfish():
+    for i in range(1, len(s_result_list_value_n)):
+            s_result_list_value_n[i].config(state="normal")
+
+#def get_skip_ip():
+ #   ip = en_ip_s.get()
+  #  if valid_ip(ip):
+   #     return ip, True
+    #else:
+     #   return ip, False
+
+def get_skip_ip_dir():
+    return en_dir_s.get()
+
+# def get_skip_auth():
+#     skip_auth = ""
+#     for i in range(len(bi_list_s)):
+#         if bi_list_value_s[i].get() == 1:
+#             if i == 0:
+#                 skip_auth += " -F host="
+#             elif i == 1:
+#                 skip_auth += " -C name="
+#             else:
+#                 skip_auth += " -H name="
+#             skip_auth += bi_list_text_s[i].get()
+#     return skip_auth
+
+def get_skip_report():
+    report_opts = []
+    if rp_list_value_s [0].get() == 1:
+        report_opts.append("-Q")
+    if rp_list_value_s[1].get() == 1:
+        report_opts.append("-u")
+    return " ".join(report_opts)
+
+def get_skip_per():
+    options = []
+    for i, value in enumerate(per_list_value_s):
+        if value.get() == 1:
+            entry = per_list_text_s[i].get().strip()
+            if entry:
+
+                if i == 0:
+                    options.extend(["-g", 20])
+                elif i == 1:
+                    options.extend(["-m", 10])
+                elif i == 2:
+                    options.extend(["-t", 15])
+                elif i == 3:
+                    options.extend(["-i", entry])
+                elif i == 4:
+                    options.extend(["-s", 100000])
+    return options
+
+def get_skip_dir():
+    dirt = en_op_s.get()
+    if dirt[(len(dirt)-1)] == '/':
+        return dirt
+    else:
+        return dirt + '/'
+    
+status_var = tk.StringVar()
+progress_bar = ttk.Progressbar(s_button, mode='indeterminate')
+
+    
+def update_result(text):
+    tag = "STDERR" if "ERROR" in text else "INFO"
+    result_text_s.insert(tk.END, text)
+    result_text_s.see(tk.END)
+
+    result_text_s.tag_config("STDERR", foreground="red")
+    result_text_s.tag_config("INFO", foreground="black")
+
+def handle_scan_error(error_msg):
+    result_text_s.insert(tk.END, f"Fatel Error: {error_msg}\n")
+    unlock_skipfish()
+    progress_bar.stop()
+
+
+
+def rskipfish():
+    target = en_ip_s.get().strip()
+    parsed_url = urlparse(target)
+    if not parsed_url.scheme:
+        parsed_url = urlparse(f"http://{target}")
+  
+    host = parsed_url.hostname
+    if not host:
+        result_text_s.insert(tk.END, "Error: Invalid target. Missing host. \n")
+        return
+    try:
+        ipaddress.ip_address(host)
+    except ValueError:
+        if not re.match(r'^([a-zA-Z0-9-]+\.)*[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$',host):
+            result_text_s.insert(tk.END, f"Error: Invalid host: {host}\n")
+            return
+    
+    target_url= parsed_url.geturl()
+        
+    try:
+        response = requests.head(target_url, timeout=10)
+        if response.status_code >=400:
+            raise requests.exceptions.RequestException
+    except requests.exceptions.RequestException:
+        result_text_s.insert(tk.END, f"Error: Target{target_url} is unreachable\n")
+        return
+    if en_op_s.get():
+        path = get_skip_dir() + datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S")
+
+    else:
+        path = os.path.join(os.getcwd(), datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"))
+
+        cmd = (f"skipfish -S /usr/share/skipfish/dictionaries/complete.wl "
+            f"{' '.join(get_skip_per())} {get_skip_report()}"
+            f"-o {shlex.quote(path)} {shlex.quote(target_url)}")
+
+    try:
+        root.after(0, update_result, f"Command: {cmd}\n")
+        skip = subprocess.Popen(
+            cmd,
+            shell=True,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            universal_newlines=True,
+        )
+
+        stdout, stderr = skip.communicate()
+        if skip.returncode != 0:
+            root.after(0, update_result, f"Error: {stderr}\n")
+            return
+        root.after(0, update_result, f"Scan Completed.\n")
+        
+        result_text_s.insert(tk.END, f"Scan completed successfully ({datetime.datetime.now()})\n")
+        url = f"file://{os.path.abspath(path)}/index.html"
+        url_path.append(url)
+        display_skipfish(url, cmd)
+        
+        mycursor = mydb.cursor()
+        sql = "INSERT INTO skipfish(date, cmd, path) VALUES(%s,%s,%s)"
+        val = (datetime.date.today(), cmd, url)
+        mycursor.execute(sql, val)
+        mydb.commit()
+        mycursor.close() 
+        
+    except Exception as e:
+        result_text_s.insert(tk.END, f"Fatal error: {str(e)}\n:")
+                               
+
+def open_prev_s():
+    try:
+        if n_prev.state() == "normal" : n_prev.focus()
+    except:
+        reset_skip()
+        n_prev = tk.Toplevel()
+        n_prev.geometry("800x300+500+200")
+        lb_prev = tk.Listbox(n_prev, width=400)
+        mycursor = mydb.cursor()
+        mycursor.execute("select id, date, cmd from skipfish")
+        db_prev = mycursor.fetchall()
+        for i in range(len(db_prev)):
+            lb_prev.insert(tk.END, str(db_prev[i][0]) + " " + str(db_prev[i][1]) + " >" + db_prev[i][2])
+        mycursor.close()
+        btn_prev = tk.Button(n_prev, text="Open", command=partial(select_prev_s, lb_prev, n_prev))
+        lb_prev.pack()
+        btn_prev.pack()
+
+def compare_to_s():
+    try:
+        if n_prev.state() == "normal" : n_prev.focus()
+    except:
+        if len(url_path) != 0:
+            n_prev = tk.Toplevel()
+            n_prev.geometry("800x300+500+200")
+            lb_prev = tk.Listbox(n_prev, width=400)
+            mycursor = mydb.cursor()
+            mycursor.execute("select id, date, cmd from skipfish")
+            db_prev = mycursor.fetchall()
+            for i in range(len(db_prev)):
+                lb_prev.insert(tk.END, str(db_prev[i][0]) + " " + str(db_prev[i][1]) + " >" + db_prev[i][2])
+            mycursor.close()
+            btn_prev = tk.Button(n_prev, text="Open", command=partial(open_compare_to_s, lb_prev, n_prev))
+            lb_prev.pack()
+            btn_prev.pack()
+        else:
+            result_text_s.insert(tk.END, "There are no current report, please scan or open a previous file.\n")
+
+
+def open_compare_to_s(lb_prev, n_prev):
+    try:
+        if n_compare.state() == "normal" : n_prev.focus()
+    except:
+        n_compare = tk.Toplevel()
+        n_compare.geometry("1550x550+500+200")
+        lb_current_tag = tk.Label(n_compare, text = "Current file info:")
+        lb_current_tag.grid(row = 0, column = 0, pady = 5, sticky = "nsw")
+        lb_current = tk.Listbox(n_compare, width = 38, height = 4)
+        lb_current.grid(row = 1, column = 0, pady = 5, sticky = "nsew")
+        lb_target_tag = tk.Label(n_compare, text = "Target file info:")
+        lb_target_tag.grid(row = 2, column = 0, pady = 5, sticky = "nsw")
+        lb_target = tk.Listbox(n_compare, width = 38, height = 4)
+        lb_target.grid(row = 3, column = 0, pady = 5, sticky = "nsew")
+        canvas1 = tk.Canvas(n_compare, width = 60, height = 30)
+        canvas1.grid(row = 0, column = 1, rowspan = 4)
+        canvas2 = tk.Canvas(n_compare, width = 60, height = 30)
+        canvas2.grid(row = 0, column = 2, rowspan = 4)
+        # Current
+        soup = get_scan_soup(url_path[0])
+        scan_info = get_scan_info(soup, "test")
+        scan_count_number = get_scan_count_number(soup)
+        scan_level_count = get_scan_level(soup)
+        file_len = scan_count_number - len(scan_level_count)
+        scan_cout_file, scan_count = get_scan_count(soup, file_len)
+        scan_item_file, scan_item = get_scan_item(soup, file_len)
+        # Target
+        db_id = lb_prev.get(tk.ACTIVE).split(" ")[0]
+        mycursor = mydb.cursor()
+        sql = "select date, cmd, path from skipfish where id = " + db_id
+        mycursor.execute(sql)
+        db_result = mycursor.fetchall()
+        db_cmd = db_result[0][1]
+        db_path = db_result[0][2]
+        mycursor.close()
+        n_prev.destroy()
+        url_path.append(db_path)
+        soup2 = get_scan_soup(db_path)
+        scan_info2 = get_scan_info(soup2, db_cmd)
+        scan_count_number2 = get_scan_count_number(soup2)
+        scan_level_count2 = get_scan_level(soup2)
+        file_len2 = scan_count_number - len(scan_level_count2)
+        scan_cout_file2, scan_count2 = get_scan_count(soup, file_len2)
+        scan_item_file2, scan_item2 = get_scan_item(soup, file_len2)
+        # Analysis data
+        security_level_set = [[],[]]
+        for i in range(0,5):
+            security_level_set[0].append(0)
+            security_level_set[1].append(0)
+        for key, val in zip(scan_level_count, scan_count):
+            security_level_set[0][int(key) - 1] +=  int(val)
+        for key, val in zip(scan_level_count2, scan_count2):
+            security_level_set[1][int(key) - 1] +=  int(val)
+        tag = ["One", "Two", "Three", "Four", "Five"]
+        df = pandas.DataFrame({"Level":tag, "Current":security_level_set[0], "Target":security_level_set[1]})
+        df.set_index("Level", inplace=True, drop=True)
+
+        file1 = pandas.DataFrame({"Type":scan_item_file, "Amount":scan_cout_file})
+        file2 = pandas.DataFrame({"Type":scan_item_file2, "Amount":scan_cout_file2})
+        df2 = pandas.merge(file1, file2, on="Type", how="outer")
+        df2.fillna(0, inplace = True)
+        df2.columns = ["Type", "Current", "Target"]
+        df2.set_index("Type", inplace = True, drop = True)
+        df2.Current = pandas.to_numeric(df2.Current)
+        df2.Target = pandas.to_numeric(df2.Target)
+        
+        # Data
+        figure1 = plt.Figure(figsize=(6, 5), dpi=100)
+        ax1 = figure1.add_subplot(111)
+        ax1.set_xlabel("Level")
+        ax1.set_ylabel("Amount")
+        ax1.set_title('Security level compare')
+        bar1 = FigureCanvasTkAgg(figure1, canvas1)
+        bar1.get_tk_widget().pack()
+        try:
+            df.plot(kind='bar', legend=True, ax=ax1)
+        except:
+            pass
+
+        figure2 = plt.Figure(figsize=(6,5), dpi=100)
+        ax2 = figure2.add_subplot(111)
+        ax2.set_xlabel("Type")
+        ax2.set_ylabel("Amount")
+        ax2.set_title('Discoved File type compare')
+        ax2.figure.autofmt_xdate(rotation=45)
+        ax2.tick_params(axis="x", labelsize=6)
+        bar2 = FigureCanvasTkAgg(figure2, canvas2)
+        bar2.get_tk_widget().pack()
+        try:
+            df2.plot(kind='bar', legend=True, ax=ax2)
+        except:
+            pass
+        # insert data
+
+        for key, val in scan_info.items():
+            if key == "Scan option: ":
+                continue
+            lb_current.insert(tk.END, "{:>20} {:<}".format(key, val))
+        for key, val in scan_info2.items():
+            if key == "Scan option: ":
+                continue
+            lb_target.insert(tk.END, "{:>20} {:<}".format(key, val))
+
+def select_prev_s(lb_prev, n_prev):
+    db_id = lb_prev.get(tk.ACTIVE).split(" ")[0]
+    mycursor = mydb.cursor()
+    sql = "select date, cmd, path from skipfish where id = " + db_id
+    mycursor.execute(sql)
+    db_result = mycursor.fetchall()
+    db_cmd = db_result[0][1]
+    db_path = db_result[0][2]
+    mycursor.close()
+    n_prev.destroy()
+    url_path.append(db_path)
+    soup = get_scan_soup(db_path)
+    scan_info = get_scan_info(soup, db_cmd)
+    scan_count_number = get_scan_count_number(soup)
+    scan_level_count = get_scan_level(soup)
+    file_len = scan_count_number - len(scan_level_count)
+    scan_cout_file, scan_count = get_scan_count(soup, file_len)
+    scan_item_file, scan_item = get_scan_item(soup, file_len)
+    display_skipfish_data(scan_info, scan_cout_file, scan_item_file, scan_count, scan_item, scan_level_count)
+
+def get_scan_soup(url):
+    opt = Options()
+    opt.add_argument("--headless")
+    browser = Firefox(options=opt)
+    browser.get(url)
+    soup = bp(browser.page_source, 'lxml')
+    browser.quit()
+    return soup
+
+def get_scan_info(soup, cmd_opt):
+    scan_name = {}
+    scan_name["Scan option: "] = cmd_opt
+    scan_name["Scanner version: "] = soup.find("td", id="sf_version").text
+    scan_name["Scan date: "] = soup.find("td", id="scan_date").text
+    scan_name["Random seed: "] = soup.find("td", id="scan_seed").text
+    scan_name["Scan time: "] = soup.find("td", id="scan_time").text
+    return scan_name
+
+def get_scan_count_number(soup):
+    scan_count_number = 0
+    for item in soup.find_all("span", class_="sum_name"):
+        scan_count_number += 1
+    return scan_count_number
+
+def get_scan_level(soup):
+    scan_level = []
+    for x in soup.find_all("div", id="issue_types"):
+        for y in x.find_all("img"):
+            if y['src'] == "i_note.png":
+                scan_level.append("1")
+            elif y['src'] == "i_warn.png":
+                scan_level.append("2")
+            elif y['src'] == "i_low.png":
+                scan_level.append("3")
+            elif y['src'] == "i_medium.png":
+                scan_level.append("4")
+            else:
+                scan_level.append("5")
+    return scan_level
+
+def get_scan_count(soup, file_len):
+    scan_count_file = []
+    scan_count = []
+    for count in soup.find_all("span", class_="s_cnt"):
+        temp = count.text[1:-1].split(" ")
+        if len(temp) == 1:
+            if len(scan_count_file) < file_len:
+                scan_count_file.append(temp[0])
+            else:
+                scan_count.append(temp[0])
+    return scan_count_file, scan_count
+        
+def get_scan_item(soup, file_len):
+    scan_item_file = []
+    scan_item = []
+    for item in soup.find_all("span", class_="sum_name"):
+        if len(scan_item_file) < file_len:
+            scan_item_file.append(item.text)
+        else:
+            scan_item.append(item.text)
+    return scan_item_file, scan_item
+
+def display_skipfish_data(scan_name, scan_count_file, scan_item_file, scan_count, scan_item, scan_level_count):
+    reset_skip_info()
+    reset_skip_result()
+    reset_chart()
+    count = 1
+    lv = scan_level_count[0]
+    # Level
+    if lv == "5":
+        s_result_list_value_n[0].insert(0, "Five")
+        s_result_list_value_n[0].config(fg = "white", background="black")
+    elif lv == "4":
+        s_result_list_value_n[0].insert(0, "Four")
+        s_result_list_value_n[0].config(fg = "white", background="red")
+    elif lv == "3":
+        s_result_list_value_n[0].insert(0, "Three")
+        s_result_list_value_n[0].config(fg = "white", background="orange")
+    elif lv == "2":
+        s_result_list_value_n[0].insert(0, "Two")
+        s_result_list_value_n[0].config(fg = "white", background="blue")
+    else:
+        s_result_list_value_n[0].insert(0, "One")
+        s_result_list_value_n[0].config(fg = "white", background="green")
+
+
+    for key, val in scan_name.items():
+        s_result_list_value_n[count].insert(0, val)
+        count = count + 1
+        # result_text_s.insert(tk.END, "{:>20} {:<}\n".format(key, val))
+
+    result_text_s.insert(tk.END, "=======Discovered file type=======\n")
+    for x, y in zip(scan_count_file, scan_item_file):
+        result_text_s.insert(tk.END, "{:>3} : {:<45}\n".format(x, y))
+
+    result_text_s.insert(tk.END, "=======Discovered security issues=======\n")
+    for x, y, z in zip(scan_count, scan_item, scan_level_count):
+        result_text_s.insert(tk.END, "Count: {:>3} > {:<45} Security Level: {}\n".format(x, y, z))
+
+    security_level_set = [0,0,0,0,0]
+    for key, val in zip(scan_level_count, scan_count):
+        security_level_set[int(key) - 1] += int(val)
+
+    tag = ["One", "Two", "Three", "Four", "Five"]
+    df1 = pandas.DataFrame({"Level":tag, "Amount":security_level_set})
+    df1.set_index("Level", inplace = True, drop = True)
+    df2 = pandas.DataFrame({"Type":scan_item_file, "Amount":scan_count_file})
+    df2.set_index("Type", inplace = True, drop = True)
+    df2.Amount = pandas.to_numeric(df2.Amount)
+    updateChart_s(df1, df2, len(scan_item_file))
+
+    lock_skipfish()
+
+def display_skipfish(url, cmd_opt):
+    reset_skip_result()
+    opt = Options()
+    opt.add_argument("--headless")
+    browser = Firefox(options=opt)
+    browser.get(url)
+    soup = bp(browser.page_source, 'lxml')
+    browser.quit()
+    scan_info = get_scan_info(soup, cmd_opt)
+    scan_count_number = get_scan_count_number(soup)
+    scan_level_count = get_scan_level(soup)
+    file_len = scan_count_number - len(scan_level_count)
+    scan_cout_file, scan_count = get_scan_count(soup, file_len)
+    scan_item_file, scan_item = get_scan_item(soup, file_len)
+    display_skipfish_data(scan_info, scan_cout_file, scan_item_file, scan_count, scan_item, scan_level_count)
+    
+    # scan_name = {}
+    # scan_name["Scan option: "] = cmd_opt
+    # scan_name["Scanner version: "] = soup.find("td", id="sf_version").text
+    # scan_name["Scan date: "] = soup.find("td", id="scan_date").text
+    # scan_name["Random seed: "] = soup.find("td", id="scan_seed").text
+    # scan_name["Scan time: "] = soup.find("td", id="scan_time").text
+
+    # scan_count_number = 0
+
+    # for item in soup.findAll("span", class_="sum_name"):
+    #     scan_count_number += 1
+
+
+    # scan_count_file = []
+    # scan_item_file = []
+    # scan_count = []
+    # scan_item = []
+    # scan_level = []
+
+    # for x in soup.findAll("div", id="issue_types"):
+    #     for y in x.findAll("img"):
+    #         if y['src'] == "i_note.png":
+    #             scan_level.append("1")
+    #         elif y['src'] == "i_warn.png":
+    #             scan_level.append("2")
+    #         elif y['src'] == "i_low.png":
+    #             scan_level.append("3")
+    #         elif y['src'] == "i_medium.png":
+    #             scan_level.append("4")
+    #         else:
+    #             scan_level.append("5")
+
+    # file_len = scan_count_number - len(scan_level)
+
+    # for count in soup.findAll("span", class_="s_cnt"):
+    #     temp = count.text[1:-1].split(" ")
+    #     if len(temp) == 1:
+    #         if len(scan_count_file) < file_len:
+    #             scan_count_file.append(temp[0])
+    #         else:
+    #             scan_count.append(temp[0])
+
+    # for item in soup.findAll("span", class_="sum_name"):
+    #     if len(scan_item_file) < file_len:
+    #         scan_item_file.append(item.text)
+    #     else:
+    #         scan_item.append(item.text)
+
+    # result_text_s.insert(tk.END, "=======Discovered file type=======\n")
+    # for x, y in zip(scan_count_file, scan_item_file):
+    #     result_text_s.insert(tk.END, "{:>3} : {:<45}\n".format(x, y))
+
+    # result_text_s.insert(tk.END, "=======Discovered security issues=======\n")
+    # for x, y, z in zip(scan_count, scan_item, scan_level):
+    #     result_text_s.insert(tk.END, "Count: {:>3} > {:<45} Security Level: {}\n".format(x, y, z))
+
+def open_detail():
+    result_text_s.insert(tk.END, "Report data is aleady displayed in the GUI.\n")
+    if len(url_path) != 0:
+        webbrowser.open(url_path[0])
+    else:
+        result_text_s.insert(tk.END, "There are no current report, please scan or open a previous file.\n")
+
+# Input
+lb_info_bi_s = tk.Label(s_input, text="Basic Input")
+lb_info_bi_s.grid(row = 0, column = 0, pady = 5, sticky="w")
+
+lb_ip_s = tk.Label(s_input, text="Ip address:")
+lb_ip_s.grid(row = 1, column = 0, pady = 5, sticky="nsew")
+en_ip_s = tk.Entry(s_input)
+en_ip_s.grid(row = 1, column = 1, pady = 5, sticky="nsew")
+
+lb_ip_s = tk.Label(s_input, text="Directory:")
+lb_ip_s.grid(row = 2, column = 0, pady = 5, sticky="nsew")
+en_dir_s = tk.Entry(s_input)
+en_dir_s.grid(row = 2, column = 1, pady = 5, sticky="nsew")
+
+btn_op_s = tk.Button(s_input, text="Output Dir:", command = select_dir_s)
+btn_op_s.grid(row = 3, column = 0, pady = 5, sticky="nsew")
+en_op_s = tk.Entry(s_input)
+en_op_s.grid(row = 3, column = 1, pady = 5, sticky="nsew")
+
+
+# bi_list_s = ["Http auth", "Custom cookie", "Custom Http header"]
+# bi_list_value_s = []
+# bi_list_text_s = []
+# for i in range(len(bi_list_s)):
+#     bi_list_value_s.append(tk.IntVar())
+#     tk.Checkbutton(s_input, text=bi_list_s[i], variable=bi_list_value_s[i]).grid(row = i + 4, column = 0, pady = 5, sticky="nsew")
+#     bi_list_text_s.append(tk.Entry(s_input))
+#     bi_list_text_s[i].grid(row = i + 4, column = 1, pady = 5, sticky="nsew")
+
+# # Scope
+lb_info_btn = tk.Label(s_scope, text="Sacn information:")
+lb_info_btn.grid(row = 0, column = 0, pady = 5, sticky="nsew")
+
+s_result_list_n = ["Security level:" ,"Scan option:", "Scanner version:", "Scan date:", "Random seed:",
+                "Scan Time:"]
+s_result_list_value_n = []
+
+for i in range(len(s_result_list_n)):
+    tk.Label(s_scope, text=s_result_list_n[i]).grid(row = i + 1, column = 0, pady = 5, sticky="nsew")
+    s_result_list_value_n.append(tk.Entry(s_scope))
+    s_result_list_value_n[i].grid(row = i + 1, column = 1, pady = 5, sticky = "nsew")    
+
+
+
+# lb_info_btn = tk.Label(s_scope, text="Crawl scope options")
+# lb_info_btn.grid(row = 0, column = 0, pady = 5, sticky="w")
+
+# s_list_s = ["Maximum crawl tree depth", "maximum children to index per node", "maximum descendants to index per branch", 
+# "max total number of requests to send", "node and link crawl probability", "repeat probabilistic scan with given seed",
+# "only follow URLs matching 'string'", "exclude URLs matching 'string'", "do not fuzz parameters named 'string'", "crawl cross-site links to another domain",
+# "trust, but do not crawl, another domain", "do not descend into 5xx locations", "do not submit any forms", "do  not parse HTML, etc, to find new links"]
+# s_list_value_s = []
+# s_list_text_s = []
+# for i in range(len(s_list_s)):
+#     s_list_value_s.append(tk.IntVar())
+#     tk.Checkbutton(s_scope, text=s_list_s[i], variable=s_list_value_s[i]).grid(row = i + 2, column = 0, pady = 5, sticky="w")
+#     if i < len(s_list_s) - 3:
+#         s_list_text_s.append(tk.Entry(s_scope))
+#         s_list_text_s[i].grid(row = i + 2, column = 1, pady = 5, sticky="nsew")
+    
+# Report
+lb_info_btn = tk.Label(s_report, text="Reporting options")
+lb_info_btn.grid(row = 0, column = 0, pady = 5, sticky="w")
+
+rp_list_s = ["completely suppress duplicate nodes in reports", "be quiet, disable realtime progress stats"]
+rp_list_value_s = []
+rp_list_text_s = []
+for i in range(len(rp_list_s)):
+    rp_list_value_s.append(tk.IntVar())
+    tk.Checkbutton(s_report, text=rp_list_s[i], variable=rp_list_value_s[i]).grid(row = i + 2, column = 0, pady = 5, sticky="w")
+    
+# Dictionary
+# lb_info_btn = tk.Label(s_dir, text="Dictionary management options")
+# lb_info_btn.grid(row = 0, column = 0, pady = 5, sticky="w")
+
+# dir_list_s = ["use a specified read-write wordlist (required)", "load a supplemental read-only wordlist", "purge words hit more than 'age' scans ago",
+#  "add new form auto-fill rule", "maximum number of keyword guesses to keep (256)", "do not auto-learn new keywords for the site", "do not fuzz extensions in directory brute-force"]
+# dir_list_value_s = []
+# dir_list_text_s = []
+# for i in range(len(dir_list_s)):
+#     dir_list_value_s.append(tk.IntVar())
+#     tk.Checkbutton(s_dir, text=dir_list_s[i], variable=dir_list_value_s[i]).grid(row = i + 2, column = 0, pady = 5, sticky="w")
+#     if i < len(dir_list_s) - 1:
+#         dir_list_text_s.append(tk.Entry(s_dir))
+#         dir_list_text_s[i].grid(row = i + 2, column = 1, pady = 5, sticky="nsew")
+    
+
+# Performance setting
+lb_info_btn = tk.Label(s_per, text="Performance setting")
+lb_info_btn.grid(row = 0, column = 0, pady = 5, sticky="w")
+
+per_list_s = ["max simultaneous TCP connections, global", "max simultaneous connections, per target IP",
+"total request response timeout", "timeout on idle HTTP connections",
+"response size limit"]
+per_list_value_s = []
+per_list_text_s = []
+for i in range(len(per_list_s)):
+    per_list_value_s.append(tk.IntVar())
+    tk.Checkbutton(s_per, text=per_list_s[i], variable=per_list_value_s[i]).grid(row = i + 2, column = 0, pady = 5, sticky="w")
+    
+
+# Result text
+result_text_s = tk.Text(s_result_text, width = 124, height = 18)
+result_text_s.grid(row = 3, column = 0, rowspan = 3,  sticky="nsew")
+
+# Chart
+canvas3 = tk.Canvas(s_chart, width = 100, height = 100)
+canvas4 = tk.Canvas(s_chart, width = 100, height = 100)
+
+canvas3.grid(row = 0, column = 0, pady = 5, sticky = "nsew")
+canvas4.grid(row = 0, column = 1, pady = 5, sticky = "nsew")
+figure3 = plt.Figure(figsize=(5,4), dpi=100)
+bar3 = FigureCanvasTkAgg(figure3, canvas3)
+bar3.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH)
+figure4 = plt.Figure(figsize=(5,4), dpi=100)
+bar4 = FigureCanvasTkAgg(figure4, canvas4)
+bar4.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH)
+
+
+def reset_chart():
+    figure3.clear()
+    bar3.draw_idle()
+    figure4.clear()
+    bar4.draw_idle()
+
+def updateChart_s(df1, df2, x):
+    figure3.clear()
+    figure4.clear()
+    ax3 = figure3.add_subplot(111)
+    ax3.set_title("Security Level Count")
+    try:
+        df1.plot(kind="bar", legend=False, ax=ax3)
+    except:
+        pass
+    color = ["green", "blue", "orange", "red","black"]
+    ax3.figure.autofmt_xdate(rotation=0)
+    for i in range(len(color)):
+        ax3.get_children()[i].set_color(color[i])
+    
+    bar3.draw_idle()
+    ax4 = figure4.add_subplot(111)
+    ax4.set_title("Discovered File type")
+    try:
+        df2.plot(kind="bar", legend=False, ax=ax4)
+    except:
+        pass
+    for i in range(x):
+        ax4.get_children()[i].set_color("#" + "%06x" % random.randint(0xAAAAAA, 0xFFFFFF))
+    ax4.figure.autofmt_xdate(rotation=25)
+    bar4.draw_idle()
+
+# Button
+lb_info_btn = tk.Label(s_button, text="Control")
+lb_info_btn.grid(row = 0, column = 0, pady = 5, sticky="w")
+
+btn_start_s = tk.Button(s_button, text="Start", command = run_skipfish)
+btn_start_s.grid(row = 1, column = 0, pady = 5, sticky="nsew")
+
+btn_reset_s = tk.Button(s_button, text="Reset", command = reset_skip)
+btn_reset_s.grid(row = 2, column = 0, pady = 5, sticky="nsew")
+
+btn_open_s = tk.Button(s_button, text="Open previous", command = open_prev_s)
+btn_open_s.grid(row = 3, column = 0, pady = 5, sticky="nsew")
+
+btn_detail_s = tk.Button(s_button, text="Open detail", command = open_detail)
+btn_detail_s.grid(row = 4, column = 0, pady = 5, sticky="nsew")
+
+btn_compare_s = tk.Button(s_button, text="Compare", command = compare_to_s)
+btn_compare_s.grid(row = 5, column = 0, pady = 5, sticky="nsew")
+
+#  Run
+root.mainloop()
